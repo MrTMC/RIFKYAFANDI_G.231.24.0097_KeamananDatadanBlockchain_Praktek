@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { WalletReadyState } from "@solana/wallet-adapter-base";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Loader2, RefreshCw, Wallet } from "lucide-react";
+import { ExternalLink, Loader2, RefreshCw, Smartphone, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/wallet";
+import { isLocalHost, isMobileDevice, phantomBrowseUrl } from "@/lib/mobile";
 
 export default function WalletButton() {
   const { wallets, wallet, select, connect, connecting, connected, publicKey } = useWallet();
@@ -24,6 +25,32 @@ export default function WalletButton() {
         <Button size="sm" variant="outline" onClick={() => void signOut()}>
           <RefreshCw className="h-3.5 w-3.5" /> Ganti akun
         </Button>
+      </div>
+    );
+  }
+
+  // HP tanpa wallet tersuntik (Chrome/Safari biasa): arahkan ke browser di aplikasi Phantom.
+  if (!installed && isMobileDevice()) {
+    return (
+      <div className="space-y-2">
+        <a
+          href={phantomBrowseUrl()}
+          className="inline-flex items-center gap-2 rounded-md bg-[#512da8] px-4 py-2 text-sm font-medium text-white hover:bg-[#45259a]"
+        >
+          <Smartphone className="h-4 w-4" /> Buka di aplikasi Phantom
+          <ExternalLink className="h-3.5 w-3.5" />
+        </a>
+        <p className="text-sm text-muted-foreground">
+          Di HP, wallet hanya bisa dipakai dari browser di dalam aplikasi Phantom. Tombol ini
+          membuka halaman ini di sana (pasang dulu aplikasi Phantom dari Play Store / App Store bila
+          belum).
+        </p>
+        {isLocalHost() && (
+          <p className="text-sm text-destructive">
+            Alamat localhost tidak bisa dibuka dari HP. Gunakan alamat web yang sudah online
+            (Vercel).
+          </p>
+        )}
       </div>
     );
   }

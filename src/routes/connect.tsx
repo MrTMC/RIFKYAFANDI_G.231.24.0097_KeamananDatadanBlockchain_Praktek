@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { signIn, useWallet } from "@/lib/wallet";
 import { useBridge } from "@/lib/solanaBridge";
+import { isMobileDevice } from "@/lib/mobile";
 import { useStore } from "@/lib/store";
 import { ErrorBox, Loading, PageTitle, Warn } from "@/components/states";
 
@@ -92,7 +93,7 @@ function ConnectPage() {
         <Loading text="Menyiapkan wallet…" />
       ) : (
         <div className="rounded-xl border bg-card p-6 shadow-card space-y-4">
-          {phantomDetected === false && !wallet && (
+          {phantomDetected === false && !wallet && !isMobileDevice() && (
             <Warn>
               Ekstensi Phantom tidak terdeteksi di browser ini. Pastikan Phantom terpasang di{" "}
               <b>browser dan profil yang sama</b>, akses situsnya diizinkan (chrome://extensions →
@@ -199,8 +200,8 @@ function SwitchAccountHelp() {
       </summary>
       <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
         <li>
-          Buka ekstensi <b>Phantom</b> → klik nama akun di kiri atas → pilih akun penerima (atau{" "}
-          <b>Add / Connect Wallet → Create new account</b> untuk membuat akun baru).
+          Buka ekstensi/aplikasi <b>Phantom</b> → klik nama akun di kiri atas → pilih akun penerima
+          (atau <b>Add / Connect Wallet → Create new account</b> untuk membuat akun baru).
         </li>
         <li>
           Aplikasi biasanya langsung mendeteksi akun baru. Jika alamat di atas tidak berubah, klik{" "}

@@ -97,6 +97,11 @@ men-deploy ulang.
 2. Phantom → Settings → Developer Settings → **Testnet Mode** → **Solana Devnet**.
 3. Isi SOL devnet gratis untuk kedua akun di <https://faucet.solana.com>.
 
+**Di HP (Android/iPhone):** pasang aplikasi **Phantom** dari Play Store / App Store, aktifkan
+Testnet Mode → Solana Devnet di aplikasinya, lalu buka alamat web (Vercel) dan ketuk
+**Buka di aplikasi Phantom**. Web akan terbuka di browser di dalam aplikasi Phantom dan bisa
+dipakai seperti di laptop. Alamat `localhost` tidak bisa dibuka dari HP.
+
 ## Alur pemakaian
 
 | # | Siapa | Langkah |

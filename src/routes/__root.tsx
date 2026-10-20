@@ -139,7 +139,8 @@ function RootComponent() {
       ) : (
         <AppShell><Outlet /></AppShell>
       )}
-      <Toaster richColors />
+      {/* Di atas, agar tidak tertutup navigasi bawah di HP. */}
+      <Toaster richColors position="top-center" />
     </QueryClientProvider>
   );
 }
