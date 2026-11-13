@@ -142,7 +142,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
         ))}
       </nav>
-      <ChatWidget />
+      <ChatWidget role={role} />
     </div>
   );
 }

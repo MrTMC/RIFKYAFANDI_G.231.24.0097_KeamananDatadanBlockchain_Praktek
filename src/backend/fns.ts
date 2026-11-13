@@ -3,7 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { deleteCookie, getCookie, getRequestHeader, setCookie } from "@tanstack/react-start/server";
 import { z } from "zod";
-import type { AppData } from "@/lib/types";
+import type { AppData, Role } from "@/lib/types";
 
 const COOKIE_OPTS = (secure: boolean) => ({
   httpOnly: true,
@@ -171,23 +171,55 @@ export const cancelDistributionFn = createServerFn({ method: "POST" })
   );
 
 // ------------------------------------------------------------------ AI (Groq)
-// Publik (tanpa login) tapi dibatasi: panjang pertanyaan divalidasi dan ada pembatas
-// laju sederhana per IP agar kuota GROQ_API_KEY tidak habis.
+// Bisa dipakai siapa saja (login atau tidak), tapi dibatasi:
+//  - peran (publik / penerima / admin) dibaca SERVER dari cookie sesi, bukan dari kiriman browser;
+//  - data yang boleh dilihat AI mengikuti peran (service.loadData sudah membatasi);
+//  - batas permintaan per IP, lalu per peran (publik paling ketat);
+//  - panjang pertanyaan dan riwayat divalidasi.
 
-const aiInput = z.object({ pertanyaan: z.string().max(2000) });
+const aiInput = z.object({
+  pertanyaan: z.string().max(2000),
+  recordId: z.string().max(20).optional(),
+  riwayat: z
+    .array(z.object({ dari: z.enum(["user", "ai"]), teks: z.string().max(600) }))
+    .max(6)
+    .optional(),
+});
 
 async function aiCtx() {
-  const [ai, env, client] = await Promise.all([
+  const [ai, env, client, service] = await Promise.all([
     import("./ai/groq"),
     import("./env"),
     import("./ai/client"),
+    import("./service"),
   ]);
+  const tooMany = () =>
+    new service.UserError("Terlalu banyak permintaan AI. Tunggu semenit lalu coba lagi.");
   const ip = (getRequestHeader("x-forwarded-for") ?? "").split(",")[0]?.trim() || "lokal";
-  if (!client.bataniLaju(ip)) {
-    const { UserError } = await import("./service");
-    throw new UserError("Terlalu banyak permintaan AI. Tunggu semenit lalu coba lagi.");
+  if (!client.bataniLaju(`ip:${ip}`, Date.now(), 30)) throw tooMany();
+
+  // Peran dari sesi di server. Kalau database tidak bisa dijangkau, anggap publik.
+  let c: Awaited<ReturnType<typeof ctx>> | null = null;
+  let peran: Role = "publik";
+  let recipientId: string | null = null;
+  try {
+    c = await ctx();
+    const sesi = await c.service.resolveSession(c.sql, c.wallet);
+    if (sesi) {
+      peran = sesi.role;
+      recipientId = sesi.recipientId;
+    }
+  } catch (e) {
+    console.error("[AidTrace][AI] gagal membaca sesi:", e);
   }
-  return { ai, groq: client.buatGroq(env.groqApiKey()) };
+  const kunci = `${peran}:${c?.wallet ?? ip}`;
+  if (!client.bataniLaju(kunci, Date.now(), ai.BATAS_PER_MENIT[peran])) throw tooMany();
+
+  const loadData = async () => {
+    if (!c) throw new Error("Database tidak tersedia.");
+    return c.service.loadData(c.sql, c.wallet);
+  };
+  return { ai, groq: client.buatGroq(env.groqApiKey()), peran, recipientId, loadData };
 }
 
 async function runAi<T>(fn: () => Promise<T>): Promise<T> {
@@ -199,43 +231,24 @@ async function runAi<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-export const tanyaAiFn = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => aiInput.parse(d))
-  .handler(({ data }) =>
-    runAi(async () => {
-      const { ai, groq } = await aiCtx();
-      return ai.tanya(groq, data.pertanyaan);
-    }),
-  );
-
-export const tanyaRagFn = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => aiInput.parse(d))
-  .handler(({ data }) =>
-    runAi(async () => {
-      const { ai, groq } = await aiCtx();
-      return ai.tanyaRag(groq, data.pertanyaan);
-    }),
-  );
-
 export const agentAiFn = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
-    aiInput.extend({ recordId: z.string().max(20).optional() }).parse(d),
-  )
+  .inputValidator((d: unknown) => aiInput.parse(d))
   .handler(({ data }) =>
     runAi(async () => {
-      const { ai, groq } = await aiCtx();
+      const { ai, groq, peran, recipientId, loadData } = await aiCtx();
       return ai.jalankanAgent(
         {
           groq,
-          // Koneksi DB dibuka saat tool dipakai, agar kegagalannya jadi { error } di jejak tool.
-          loadPublic: async () => {
-            const c = await ctx();
-            return c.service.loadData(c.sql, null);
-          },
+          loadData,
           readChain: async (sig) => (await import("./solanaRpc")).getChainTx(sig),
         },
-        data.pertanyaan,
-        data.recordId,
+        {
+          pertanyaan: data.pertanyaan,
+          recordId: data.recordId,
+          riwayat: data.riwayat,
+          peran,
+          recipientId,
+        },
       );
     }),
   );

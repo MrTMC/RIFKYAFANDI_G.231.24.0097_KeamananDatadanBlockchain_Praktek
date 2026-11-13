@@ -9,10 +9,10 @@ const WINDOW_MS = 60_000;
 const MAKS_PER_MENIT = 10;
 const hits = new Map<string, number[]>();
 
-/** true jika permintaan masih boleh diproses (maks 10/menit per IP). */
-export function bataniLaju(key: string, now = Date.now()): boolean {
+/** true jika permintaan masih boleh diproses (default maks 10/menit per kunci). */
+export function bataniLaju(key: string, now = Date.now(), maks = MAKS_PER_MENIT): boolean {
   const recent = (hits.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
-  if (recent.length >= MAKS_PER_MENIT) {
+  if (recent.length >= maks) {
     hits.set(key, recent);
     return false;
   }

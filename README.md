@@ -150,22 +150,33 @@ TanStack Start (React 19 + Vite) · Tailwind CSS · shadcn/ui · Postgres (Supab
 
 ## Fitur AI (Groq) — Praktikum 5
 
-Gelembung chat **Asisten AidTrace** (pojok kanan bawah, ada di semua halaman) memakai dua lapis AI. Prinsipnya: *AI membantu, blockchain membuktikan.*
+Gelembung chat **Si Bukti** (pojok kanan bawah, ada di semua halaman) bisa dipakai siapa saja,
+login maupun tidak. Prinsipnya: *AI membantu, blockchain membuktikan.* AI berbentuk agent dengan
+tiga tool, dan model sendiri yang memilih tool mana yang dipakai:
 
-| Fitur | Jenis | Kode |
+| Tool | Fungsi |
+| --- | --- |
+| `ringkasan_data` | Jumlah, total nominal, per status, per program (dihitung kode dari database) |
+| `cek_bukti_onchain` | Memeriksa id record (`DIST-xxxx`) di Solana devnet: memo, hash, signer admin, konfirmasi penerima |
+| `cari_pengetahuan_lokal` | Mencari catatan prosedur/istilah (RAG kata kunci), menyebut id catatan |
+
+**Hak akses per peran** (peran dibaca server dari cookie sesi login, tidak bisa diubah lewat chat):
+
+| Peran | Yang bisa dilihat AI | Batas permintaan |
 | --- | --- | --- |
-| Pertanyaan biasa | RAG (pencarian kata kunci atas catatan lokal, menyebut id catatan) | `src/backend/ai/pengetahuan.ts`, `tanyaRag` |
-| Pesan berisi id record (mis. `DIST-0008`) | AI agent: tool `cek_bukti_onchain` (membaca devnet) + `cari_pengetahuan_lokal`, maks 5 putaran, jejak tool ditampilkan | `src/backend/ai/groq.ts`, `jalankanAgent` |
+| Publik (belum login) | Hanya distribusi yang sudah tercatat (data publik) | 8 per menit |
+| Penerima | Data publik + ringkasan miliknya sendiri | 15 per menit |
+| Admin | Ringkasan lengkap: termasuk yang menunggu transaksi dan jumlah penerima aktif | 30 per menit |
 
-Antarmuka: `src/components/ChatWidget.tsx`, dipasang di `AppShell`. Pesan yang memuat `DIST-xxxx` dikirim ke agent; selain itu ke RAG.
+Ada juga batas 30 permintaan per menit per IP. Nama penerima, wallet, dan nominal per orang tidak
+pernah masuk ke AI untuk peran apa pun. Kode: `src/backend/ai/groq.ts` (agent, tool, persona),
+`src/backend/fns.ts` (peran dan batas laju), `src/components/ChatWidget.tsx` (antarmuka).
 
-- Model: `openai/gpt-oss-20b` (production, tercepat/termurah di Groq, mendukung tool calling).
-  Jika sering gagal memanggil tool, ganti `MODEL` di `src/backend/ai/groq.ts` ke `openai/gpt-oss-120b`.
-- Kunci: set `GROQ_API_KEY` di environment **server** (mis. `.env.local`, sudah di-gitignore atau
-  secret Vercel). Jangan pakai awalan `VITE_` dan jangan di-commit.
-- Data yang dikirim ke Groq: hanya pertanyaan, catatan dummy, dan hasil pemeriksaan publik
-  (id record, status, hasil cek). **Tidak ada nama penerima, wallet penuh, atau kunci.**
-- Batasan: AI tidak bisa menandatangani/mengirim transaksi (server tanpa wallet), status resmi
-  dihitung kode (bukan model), dan AI tidak boleh memvonis penyelewengan. Endpoint dibatasi
-  10 permintaan/menit per IP.
-- Catatan di `pengetahuan.ts` adalah **contoh dummy**; ganti dengan hasil wawancara narasumber.
+- Model: `openai/gpt-oss-20b` (production, cepat, mendukung tool calling). Jika sering gagal
+  memanggil tool, ganti `MODEL` di `src/backend/ai/groq.ts` ke `openai/gpt-oss-120b`.
+- Kunci: set `GROQ_API_KEY` di environment **server** (`.env.local` atau env hosting). Jangan pakai
+  awalan `VITE_` dan jangan di-commit.
+- Batasan: AI tidak bisa menandatangani/mengirim transaksi (server tanpa wallet), status resmi dan
+  angka dihitung kode (bukan model), dan AI tidak boleh memvonis penyelewengan.
+- Catatan di `src/backend/ai/pengetahuan.ts` bersumber dari aturan sistem; tambahkan hasil wawancara
+  narasumber bila ada.
