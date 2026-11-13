@@ -170,6 +170,76 @@ export const cancelDistributionFn = createServerFn({ method: "POST" })
     }),
   );
 
+// ------------------------------------------------------------------ AI (Groq)
+// Publik (tanpa login) tapi dibatasi: panjang pertanyaan divalidasi dan ada pembatas
+// laju sederhana per IP agar kuota GROQ_API_KEY tidak habis.
+
+const aiInput = z.object({ pertanyaan: z.string().max(2000) });
+
+async function aiCtx() {
+  const [ai, env, client] = await Promise.all([
+    import("./ai/groq"),
+    import("./env"),
+    import("./ai/client"),
+  ]);
+  const ip = (getRequestHeader("x-forwarded-for") ?? "").split(",")[0]?.trim() || "lokal";
+  if (!client.bataniLaju(ip)) {
+    const { UserError } = await import("./service");
+    throw new UserError("Terlalu banyak permintaan AI. Tunggu semenit lalu coba lagi.");
+  }
+  return { ai, groq: client.buatGroq(env.groqApiKey()) };
+}
+
+async function runAi<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    const { terjemahkanErrorGroq } = await import("./ai/groq");
+    throw new Error(terjemahkanErrorGroq(e).message);
+  }
+}
+
+export const tanyaAiFn = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => aiInput.parse(d))
+  .handler(({ data }) =>
+    runAi(async () => {
+      const { ai, groq } = await aiCtx();
+      return ai.tanya(groq, data.pertanyaan);
+    }),
+  );
+
+export const tanyaRagFn = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => aiInput.parse(d))
+  .handler(({ data }) =>
+    runAi(async () => {
+      const { ai, groq } = await aiCtx();
+      return ai.tanyaRag(groq, data.pertanyaan);
+    }),
+  );
+
+export const agentAiFn = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    aiInput.extend({ recordId: z.string().max(20).optional() }).parse(d),
+  )
+  .handler(({ data }) =>
+    runAi(async () => {
+      const { ai, groq } = await aiCtx();
+      return ai.jalankanAgent(
+        {
+          groq,
+          // Koneksi DB dibuka saat tool dipakai, agar kegagalannya jadi { error } di jejak tool.
+          loadPublic: async () => {
+            const c = await ctx();
+            return c.service.loadData(c.sql, null);
+          },
+          readChain: async (sig) => (await import("./solanaRpc")).getChainTx(sig),
+        },
+        data.pertanyaan,
+        data.recordId,
+      );
+    }),
+  );
+
 // ------------------------------------------------------------------ penerima
 
 export const finalizeConfirmationFn = createServerFn({ method: "POST" })

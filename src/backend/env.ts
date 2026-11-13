@@ -4,6 +4,7 @@
 //   DATABASE_URL     (wajib)  connection string Postgres/Supabase (pooler, port 6543)
 //   SESSION_SECRET   (wajib di produksi) string acak ≥ 32 karakter untuk menandatangani cookie sesi
 //   ADMIN_WALLETS    (opsional) alamat wallet admin awal, dipisah koma
+//   GROQ_API_KEY     (wajib untuk fitur AI) kunci API dari console.groq.com
 //   SOLANA_RPC_URL   (opsional) default https://api.devnet.solana.com
 //   APP_DOMAIN       (disarankan di produksi) domain web, mis. aidtrace-receipt.vercel.app
 //                    — pesan login hanya diterima jika dibuat untuk domain ini
@@ -44,6 +45,13 @@ export function envAdminWallets(): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+/** Kunci API Groq (fitur AI). Hanya di server — jangan beri awalan VITE_. */
+export function groqApiKey(): string {
+  const v = env("GROQ_API_KEY");
+  if (!v) throw new Error("GROQ_API_KEY belum diatur di environment server.");
+  return v;
 }
 
 export function solanaRpcUrl(): string {

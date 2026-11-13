@@ -13,6 +13,7 @@ import {
   Tags,
 } from "lucide-react";
 import { useWallet, signOut } from "@/lib/wallet";
+import { ChatWidget } from "@/components/ChatWidget";
 
 type Item = {
   to:
@@ -141,6 +142,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
         ))}
       </nav>
+      <ChatWidget />
     </div>
   );
 }

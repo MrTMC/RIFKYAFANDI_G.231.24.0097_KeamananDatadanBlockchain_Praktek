@@ -145,3 +145,27 @@ TanStack Start (React 19 + Vite) · Tailwind CSS · shadcn/ui · Postgres (Supab
 - Biaya transaksi dibayar wallet masing-masing (perlu SOL devnet dari faucet).
 - Pendaftaran wallet penerima masih dilakukan admin; tahap berikutnya: penerima mendaftarkan wallet
   sendiri dengan kode verifikasi.
+
+---
+
+## Fitur AI (Groq) — Praktikum 5
+
+Gelembung chat **Asisten AidTrace** (pojok kanan bawah, ada di semua halaman) memakai dua lapis AI. Prinsipnya: *AI membantu, blockchain membuktikan.*
+
+| Fitur | Jenis | Kode |
+| --- | --- | --- |
+| Pertanyaan biasa | RAG (pencarian kata kunci atas catatan lokal, menyebut id catatan) | `src/backend/ai/pengetahuan.ts`, `tanyaRag` |
+| Pesan berisi id record (mis. `DIST-0008`) | AI agent: tool `cek_bukti_onchain` (membaca devnet) + `cari_pengetahuan_lokal`, maks 5 putaran, jejak tool ditampilkan | `src/backend/ai/groq.ts`, `jalankanAgent` |
+
+Antarmuka: `src/components/ChatWidget.tsx`, dipasang di `AppShell`. Pesan yang memuat `DIST-xxxx` dikirim ke agent; selain itu ke RAG.
+
+- Model: `openai/gpt-oss-20b` (production, tercepat/termurah di Groq, mendukung tool calling).
+  Jika sering gagal memanggil tool, ganti `MODEL` di `src/backend/ai/groq.ts` ke `openai/gpt-oss-120b`.
+- Kunci: set `GROQ_API_KEY` di environment **server** (mis. `.env.local`, sudah di-gitignore atau
+  secret Vercel). Jangan pakai awalan `VITE_` dan jangan di-commit.
+- Data yang dikirim ke Groq: hanya pertanyaan, catatan dummy, dan hasil pemeriksaan publik
+  (id record, status, hasil cek). **Tidak ada nama penerima, wallet penuh, atau kunci.**
+- Batasan: AI tidak bisa menandatangani/mengirim transaksi (server tanpa wallet), status resmi
+  dihitung kode (bukan model), dan AI tidak boleh memvonis penyelewengan. Endpoint dibatasi
+  10 permintaan/menit per IP.
+- Catatan di `pengetahuan.ts` adalah **contoh dummy**; ganti dengan hasil wawancara narasumber.
